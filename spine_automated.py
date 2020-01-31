@@ -18,11 +18,11 @@ import time
 username = 'admin'
 password = getpass()
 
-DEVICE_LIST = open('spine_device_list.txt') # Opens the '08_device_list.txt' file and reads the lines as hostnames
+DEVICE_LIST = open('spine_device_list.txt')
 for DEVICE in DEVICE_LIST:
     DEVICE = DEVICE.strip()
 
-    N9K = { # Defines device variable to initiate SSH connection
+    N9K = {
     'ip':   DEVICE,
     'username': 'admin',
     'password': password ,
@@ -31,7 +31,7 @@ for DEVICE in DEVICE_LIST:
     print ('\n #### Connecting to the '  + DEVICE + ' ' + '#### \n' )
 
     try:
-        net_connect = ConnectHandler(**N9K)  # Initiates the SSH connection to the N9K variable
+        net_connect = ConnectHandler(**N9K)
     except NetMikoTimeoutException:
         print ('\n #### Device not reachable #### \n')
         continue
@@ -43,7 +43,6 @@ for DEVICE in DEVICE_LIST:
         continue
 
     print ('\n #### Connection successfull, enabling VXLAN Spine related features... #### \n')
-    # Features necessary to configure VXLAN EVPN with MP-BGP using OSPF as unicast underlay and PIM as underlay multicast underlay.
     features = [ 'feature ospf',
                     'feature bgp',
                     'feature pim',
@@ -53,13 +52,13 @@ for DEVICE in DEVICE_LIST:
     net_connect.send_config_set(features)
     print ('\n #### Features are successfully enabled #### \n')
 
-    SPINE_IP_LIST = open('spine_ip_list.txt') # Opens the file that contains the "hostname" and "desired ip addresses" to be used as VTEP IP addresses
-    for line in SPINE_IP_LIST: # Creating a variable called "line" in the file above
-        line_fields = line.split() # Taking a line as a whole in the file then indexes the values
-        hostname = line_fields[0] # First value in the particular line is defined as "hostname"
-        ip_1 = line_fields[1] # Second value in the particular line is defined as "ip_1"
-        ip_2 = line_fields[2] # Third value in the particular line is defined as "ip_2"
-        if hostname == DEVICE: # If the "hostname" variable matches with "DEVICE" variable (line 20) sends the following commands down to VTEP
+    SPINE_IP_LIST = open('spine_ip_list.txt')
+    for line in SPINE_IP_LIST:
+        line_fields = line.split()
+        hostname = line_fields[0]
+        ip_1 = line_fields[1]
+        ip_2 = line_fields[2]
+        if hostname == DEVICE:
             spine_ip_config = ['interface loopback 0',
                                 'ip address' + ' ' + ip_1  +'/32',
                                 'description PIM_Anycast_IP_Address',
@@ -94,7 +93,6 @@ for DEVICE in DEVICE_LIST:
             time.sleep(2)
 
             print('\n #### Configuring Leaf facing interfaces #### \n')
-
             leaf_int_config = ['interface ethernet 1/1-3',
                                 'no switchport',
                                 'mtu 9216',
@@ -105,10 +103,6 @@ for DEVICE in DEVICE_LIST:
                                 'ip unnumbered loopback 100',
                                 'no shutdown' ]
             net_connect.send_config_set(leaf_int_config)
-
-            #output = net_connect.send_command('show run interface ethernet 1/1-3')
-            #print(output)
-            #time.sleep(3)
             print('\n #### Leaf facing interface configuration is done #### \n')
             time.sleep(1)
 
@@ -123,9 +117,9 @@ for DEVICE in DEVICE_LIST:
             print('\n #### Configuring BGP related settings #### \n')
 
             vtep_peer_list = open('vtep_ip_list.txt')
-            for line in vtep_peer_list: # Creating a variable called "line" in the file above
-                line_fields = line.split() # Taking a line as a whole in the file then indexes the values
-                vtep_ip = line_fields[2] # Second value in the particular line is defined as "vtep_ip"
+            for line in vtep_peer_list:
+                line_fields = line.split()
+                vtep_ip = line_fields[2]
 
                 bgp_config = ['router bgp 65001',
                                     'address-family ipv4 unicast',
@@ -141,6 +135,7 @@ for DEVICE in DEVICE_LIST:
                                     'send-community both',
                                     'route-reflector-client',
                                     'exit',
-                                    'neighbor' + ' ' + vtep_ip , # The variable "vtep_ip" defined in the loop is going to be used as vtep neighbor ip address
+                                    'neighbor' + ' ' + vtep_ip ,
                                     'inherit peer VTEP-PEER']
                 net_connect.send_config_set(bgp_config)
+                net_connect.save_config()
