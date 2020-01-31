@@ -18,11 +18,11 @@ import time
 username = 'admin'
 password = getpass()
 
-DEVICE_LIST = open('vtep_device_list.txt') # Opens the 'vtep_list.txt' file and reads the lines as hostnames of the Leaves. Could contain ip addresses or FQDNs.
-for DEVICE in DEVICE_LIST:                 # Since the majority of the configuration is going to be repeated with same values, a for loop will take or repetition on multiple leaves.
+DEVICE_LIST = open('vtep_device_list.txt')
+for DEVICE in DEVICE_LIST:
     DEVICE = DEVICE.strip()
 
-    N9K = {                                # Defines device variable extracted from 'vtep_device_list.txt' file to initiate SSH connection
+    N9K = {
     'ip':   DEVICE,
     'username': 'admin',
     'password': password ,
@@ -31,7 +31,7 @@ for DEVICE in DEVICE_LIST:                 # Since the majority of the configura
     print ('\n #### Connecting to the '  + DEVICE + ' ' + '#### \n' )
 
     try:
-        net_connect = ConnectHandler(**N9K)  # Initiates the SSH connection to the N9K variable
+        net_connect = ConnectHandler(**N9K)
     except NetMikoTimeoutException:
         print ('\n #### Device not reachable #### \n')
         continue
@@ -44,7 +44,7 @@ for DEVICE in DEVICE_LIST:                 # Since the majority of the configura
 
     print ('\n #### Connection successfull, enabling VXLAN related features... #### \n')
 
-    features = [ 'feature ospf',                   # Features necessary to configure VXLAN EVPN with MP-BGP using OSPF as unicast underlay and PIM as underlay multicast underlay.
+    features = [ 'feature ospf', 
                     'feature bgp',
                     'feature pim',
                     'feature nv overlay',
@@ -58,14 +58,14 @@ for DEVICE in DEVICE_LIST:                 # Since the majority of the configura
     time.sleep(2)
     print ('\n #### Features are successfully enabled #### \n')
 
-    VTEP_IP_LIST = open('vtep_ip_list.txt') # Opens the file that contains the "hostname" and "desired ip addresses" to be used as VTEP IP addresses (check the file).
-    for line in VTEP_IP_LIST:               # Creating a variable called "line" in the file above
-        line_fields = line.split()          # Taking a line as a whole in the file then indexes the values
-        hostname = line_fields[0]           # First value in the particular line is defined as "hostname"
-        ip_1 = line_fields[1]               # Second value in the particular line is defined as "ip_1"
-        ip_2 = line_fields[2]               # Third value in the particular line is defined as "ip_2"
-        if hostname == DEVICE:              # If the "hostname" variable matches with "DEVICE" variable (line 20) sends the following commands down to VTEP
-            vtep_ip_config = ['interface loopback 0',                # The loopback to be used as VTEP IP in VXLAN fabric.
+    VTEP_IP_LIST = open('vtep_ip_list.txt') 
+    for line in VTEP_IP_LIST:
+        line_fields = line.split()
+        hostname = line_fields[0]
+        ip_1 = line_fields[1]
+        ip_2 = line_fields[2]
+        if hostname == DEVICE:
+            vtep_ip_config = ['interface loopback 0',
                                 'ip address' + ' ' + ip_1  +'/32',
                                 'description VTEP_IP_Address',
                                 'ip router ospf vxlan_underlay area 0.0.0.0',
@@ -74,7 +74,7 @@ for DEVICE in DEVICE_LIST:                 # Since the majority of the configura
             print('\n #### VTEP IP Address is configured on Loopback 0 #### \n')
             time.sleep(2)
 
-            numbered_ip_config = ['interface loopback 100',           # The loopback to be used as "ip numbered" interface on leaf-to-spine physical interface.
+            numbered_ip_config = ['interface loopback 100',
                                     'ip address' + ' ' + ip_2  +'/32',
                                     'description Numbered_interface_ip_to_be_used_on_p2p_links',
                                     'ip router ospf vxlan_underlay area 0.0.0.0',
@@ -102,10 +102,10 @@ for DEVICE in DEVICE_LIST:                 # Since the majority of the configura
     print('\n #### Configuring Spine facing interfaces #### \n')
     time.sleep(2)
 
-    spine_int_config = ['interface ethernet 1/1-2', #interfaces connected to the Spines.
+    spine_int_config = ['interface ethernet 1/1-2',
                             'no switchport',
                             'mtu 9216',
-                            'medium p2p',           # Must be configured before enabling "ip unnumbered" on the interface
+                            'medium p2p',
                             'ip ospf network point-to-point',
                             'ip router ospf vxlan_underlay area 0.0.0.0',
                             'ip pim sparse-mode',
@@ -129,7 +129,7 @@ for DEVICE in DEVICE_LIST:                 # Since the majority of the configura
     time.sleep (2)
 
     print('\n #### Configuring PIM Anycast RP Address on VTEP #### \n')
-    pim_config = ['ip pim rp-address 1.1.1.190 group-list 225.12.0.0/16', # Spines are configured with 1.1.1.190 as PIM RP address.
+    pim_config = ['ip pim rp-address 1.1.1.190 group-list 225.12.0.0/16',
                     'ip pim ssm range 232.0.0.0/8']
     net_connect.send_config_set (pim_config)
     output = net_connect.send_command ('show ip pim rp')
@@ -138,11 +138,11 @@ for DEVICE in DEVICE_LIST:                 # Since the majority of the configura
 
     print('\n #### Configuring BGP related settings #### \n')
     SPINE_IP_LIST = open('spine_ip_list.txt')
-    for line in SPINE_IP_LIST: # Creating a variable called "line" in the file above
-        line_fields = line.split() # Taking a line as a whole in the file then indexes the values
-        spine_ip = line_fields[2] # Third value in the particular line is defined as "spine_ip"
+    for line in SPINE_IP_LIST:
+        line_fields = line.split()
+        spine_ip = line_fields[2]
 
-        bgp_overlay_config = ['router bgp 65001', # Creating BGP process and defining the spines as iBGP peers. Spines are also Route Reflectors.
+        bgp_overlay_config = ['router bgp 65001',
                                 'neighbor' + ' ' + spine_ip + ' ' + 'remote-as 65001',
                                 'update-source loopback 100',
                                 'address-family ipv4 unicast',
@@ -196,7 +196,7 @@ for DEVICE in DEVICE_LIST:                 # Since the majority of the configura
     time.sleep(2)
 
     print('\n #### Creating L2 VNIs and adding them to the EVPN #### \n')
-    for x in range (21,30):                                                     # Setting a loop to create l2 VNIs starting from 21 to 30.
+    for x in range (21,30):
         l2_vni_config = ['vlan' + ' ' + str(x),
                             'vn-segment 100'+str(x),
                             'exit',
